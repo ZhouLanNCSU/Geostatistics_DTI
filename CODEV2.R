@@ -34,6 +34,10 @@ return(wrap(mylist));
 "
 CPP_inv<-cxxfunction(signature(list_input="List",parts_input="integer"), body = CPP_inv.body,plugin="RcppArmadillo")
 
+CPP_inv<-function(cov_list,parts){
+  lapply(1:parts,function(i) solve(cov_list[[i]]))
+}
+
 
 residual_inv<-function(s_list,rho,smooth,parts){
   
@@ -126,15 +130,25 @@ Working_Model<-function(Data,s,X,
   
   plugin_list=list(plugin_beta11,plugin_beta22,plugin_beta33,plugin_beta21,plugin_beta31,plugin_beta32)
   
+  
+  sd_beta11= sapply(1:n,function(v) summary(lm(log((t11[v,]))~0+list.rbind(X)))$sigma)
+  sd_beta22= sapply(1:n,function(v) summary(lm(log((t22[v,]))~0+list.rbind(X)))$sigma)
+  sd_beta33= sapply(1:n,function(v) summary(lm(log((t33[v,]))~0+list.rbind(X)))$sigma)
+  sd_beta21= sapply(1:n,function(v) summary(lm(t21[v,]~0+list.rbind(X)))$sigma)
+  sd_beta31= sapply(1:n,function(v) summary(lm(t31[v,]~0+list.rbind(X)))$sigma)
+  sd_beta32= sapply(1:n,function(v) summary(lm(t32[v,]~0+list.rbind(X)))$sigma)
+  
+  
+  
   ##residual 
   var_m=var(c(q2logt11,q2logt22,q2logt33,t21,t32,t31))
-  rho=10
+  rho=2
   smooth=0.5
   INV=residual_inv(s_list,rho,smooth,parts)
   INV_LOGDET=lapply(INV, logdet)
   
   ##mean
-  s_beta=var(c(beta11,beta22,beta33, beta21,beta32,beta31))
+  s_beta=s_beta0=mean(c(sd_beta11,sd_beta22,sd_beta33,sd_beta31,sd_beta32,sd_beta21))^2
   mean_rho=2
   mean_smooth=0.5
   mean_INV=residual_inv(s_list,mean_rho,mean_smooth,parts)
@@ -188,9 +202,9 @@ Working_Model<-function(Data,s,X,
     ##########################################
     #######Mean Spatial Prameters ############
     ##########################################
-    if(it==1|sample(c(0,1),1,prob=c(0.8,0.2))==1){
+    if(it==1|sample(c(0,1),1,prob=c(0,1))==1){
     ####variance
-    a<- 6*n*p/2+a_var
+    a<- n*N/2+a_var
     b<- b_var
     beta_all_list=list(beta11,beta22,beta33,beta21,beta31,beta32)
     DDD=bdiag(mean_INV)%x% Diagonal(p)
@@ -203,6 +217,7 @@ Working_Model<-function(Data,s,X,
     }
     s_beta=1/rgamma(1,a,as.numeric(b))
     }
+    s_beta=rgamma(1,10,10)*s_beta0
     ####covariance
     u <- rnorm(2)*0.05
     theta_prop <- log(c(mean_rho,mean_smooth)) + S %*% u 
@@ -366,7 +381,7 @@ Working_Model<-function(Data,s,X,
     ##############################################:
     
     #var_m=1/50*rgamma(1,10,10)
-    if(it==1|sample(c(0,1),1,prob=c(0.8,0.2))==1){
+    if(it==1|sample(c(0,1),1,prob=c(0,1))==1){
     a<- 6*N*n/2+a_var
     b<- b_var
     ###diagonals
